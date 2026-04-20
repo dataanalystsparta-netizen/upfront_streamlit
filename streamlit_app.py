@@ -56,7 +56,26 @@ def load_and_clean_data():
 
     # --- CANCELLATION REASON CLEANUP ---
     if 'Reason of cancellation' in df.columns:
-        df['Reason of cancellation'] = df['Reason of cancellation'].astype(str).str.strip().replace(['nan', 'None', ''], 'N/A')
+        # Standardize whitespace and casing
+        df['Reason of cancellation'] = df['Reason of cancellation'].astype(str).str.strip()
+        
+        # Explicit mapping for known duplicates/typos
+        reason_map = {
+            'Family interference': 'Family Interference',
+            'Family Interference': 'Family Interference',
+            'Inbound cancel': 'Inbound Cancel',
+            'Inbound Cancel': 'Inbound Cancel',
+            'Improper sale': 'Improper Sale',
+            'Not for sale': 'Not For Sale',
+            'Invalid account details': 'Invalid Account Details',
+            'nan': 'N/A',
+            'None': 'N/A',
+            '': 'N/A'
+        }
+        df['Reason of cancellation'] = df['Reason of cancellation'].replace(reason_map)
+        
+        # Final touch: Title Case for anything else missed
+        df['Reason of cancellation'] = df['Reason of cancellation'].str.title().replace('N/A', 'N/A')
 
     # Standardize other columns
     for col in ['WlcmStatus', 'Payment Status']:
@@ -160,17 +179,16 @@ try:
             fig_pie = px.pie(q_mix, names='Quality status', values='count', hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
 
-    # --- NEW: CANCELLATION REASON SUMMARY ---
+    # --- CANCELLATION REASON SUMMARY ---
     st.subheader("🚫 Cancellation Reason Summary")
     if not f_df.empty and 'Reason of cancellation' in f_df.columns:
-        # Filtering for rows that aren't Approved to see why they dropped
         cancel_df = f_df[f_df['Quality status'] != 'Approved']
         if not cancel_df.empty:
             reason_counts = cancel_df['Reason of cancellation'].value_counts().reset_index()
             reason_counts.columns = ['Reason', 'Count']
             
             fig_reasons = px.bar(
-                reason_counts.head(10), # Show top 10 reasons
+                reason_counts.head(10), 
                 y='Reason', x='Count',
                 orientation='h',
                 text_auto=True,
