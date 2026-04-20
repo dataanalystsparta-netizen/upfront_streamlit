@@ -142,15 +142,15 @@ try:
     with kpi2:
         # Using the cleaned 'Approved' value
         q_app = len(f_df[f_df['Quality status'] == 'Approved'])
-        st.metric("Quality Approved", q_app)
+        st.metric("Quality Approved", f"{q_app:,}")
 
     with kpi3:
         w_done = len(f_df[f_df['Welcome Status'].str.lower() == 'done'])
-        st.metric("Welcome Done", w_done)
+        st.metric("Welcome Done", f"{w_done:,}")
 
     with kpi4:
         p_acc = len(f_df[f_df['Payment Status'].str.lower() == 'accepted'])
-        st.metric("Payments Accepted", p_acc)
+        st.metric("Payments Accepted", f"{p_acc:,}")
 
     st.markdown("---")
 
@@ -167,12 +167,11 @@ try:
             fig_trend = px.line(
                 monthly_rev, x='Month', y='Amount', 
                 markers=True, 
-                text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.2f}"),
+                text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"),
                 labels={"Amount": "Revenue (£)"}
             )
             fig_trend.update_traces(line_color='#00CC96', line_width=3, textposition="top center")
             fig_trend.update_xaxes(type='category', categoryorder='array', categoryarray=monthly_rev['Month'])
-            fig_trend.update_yaxes(tickprefix="£", tickformat=",.2f") # Add £ and separators to y-axis
             st.plotly_chart(fig_trend, use_container_width=True)
 
     # --- AGENT PERFORMANCE & QUALITY MIX ---
@@ -184,11 +183,9 @@ try:
             rev_chart = f_df.groupby('Agent')['Amount'].sum().sort_values(ascending=False).reset_index()
             fig_rev = px.bar(
                 rev_chart, x='Agent', y='Amount', 
-                text=rev_chart['Amount'].apply(lambda x: f"£{x:,.2f}"), # Formatted text values
-                color='Amount',
+                text_auto='.2s', color='Amount',
                 color_continuous_scale='Greens'
             )
-            fig_rev.update_yaxes(tickprefix="£", tickformat=",.2f") # Add £ and separators to y-axis
             st.plotly_chart(fig_rev, use_container_width=True)
 
     with col_right:
@@ -234,26 +231,19 @@ try:
             'Payment Status': 'Accepted (P)'
         }).sort_values(by='Total Revenue (£)', ascending=False).reset_index()
 
-        # Format the matrix revenue column directly
-        matrix['Total Revenue (£)'] = matrix['Total Revenue (£)'].apply(lambda x: f"£{x:,.2f}")
-        
-        st.dataframe(matrix, use_container_width=True, hide_index=True)
+        st.dataframe(matrix.style.format({"Total Revenue (£)": "£{:,.2f}"}), use_container_width=True, hide_index=True)
 
     # --- SEARCH ---
     with st.expander("🔍 Search Transaction Details"):
-        # Format the Amount column just for the data tables to retain clean visuals
-        display_df = f_df.copy()
-        display_df['Amount'] = display_df['Amount'].apply(lambda x: f"£{x:,.2f}")
-        
         search_query = st.text_input("Search by Customer Name or Phone Number")
         if search_query:
-            search_df = display_df[
-                (display_df['Customer Name'].str.contains(search_query, case=False, na=False)) |
-                (display_df['Phone No.'].astype(str).str.contains(search_query, na=False))
+            search_df = f_df[
+                (f_df['Customer Name'].str.contains(search_query, case=False, na=False)) |
+                (f_df['Phone No.'].astype(str).str.contains(search_query, na=False))
             ]
-            st.dataframe(search_df, use_container_width=True)
+            st.dataframe(search_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
         else:
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(f_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
 
 except Exception as e:
     st.error(f"Error: {e}")
