@@ -60,7 +60,7 @@ def load_and_clean_data():
             'Rejected/Rwork':'Quality Rejected',
             'Cx is not interested':'Quality Cancelled',
             'Son Got the POA':'Quality Cancelled',
-            
+            'Duplicate/Rejected':'Duplicate',
             'Hold': 'Hold',
             'HOld': 'Hold',
             'hold':'Hold',
