@@ -118,18 +118,27 @@ try:
     st.markdown("---")
 
     # --- MONTHLY TREND (NEW SECTION) ---
+# --- MONTHLY TREND (FIXED) ---
     st.subheader("📅 Monthly Revenue Trend")
     if not f_df.empty:
-        # Grouping by month - keeping data order if possible
         monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
+        
+        # Use 'text' instead of 'text_auto' for line charts
         fig_trend = px.line(
             monthly_rev, x='Month', y='Amount', 
-            markers=True, text_auto='.2s',
+            markers=True, 
+            text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"), # Formats labels as £1k, etc.
             labels={"Amount": "Revenue (£)"}
         )
-        fig_trend.update_traces(line_color='#00CC96', line_width=3)
+        
+        # Position the text above the markers
+        fig_trend.update_traces(
+            line_color='#00CC96', 
+            line_width=3,
+            textposition="top center"
+        )
+        
         st.plotly_chart(fig_trend, use_container_width=True)
-
     # --- AGENT PERFORMANCE BREAKDOWN ---
     col_left, col_right = st.columns([2, 1])
 
