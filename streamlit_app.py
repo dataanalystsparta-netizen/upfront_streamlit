@@ -58,6 +58,7 @@ def load_and_clean_data():
             'cancelled': 'Quality Cancelled',
             'Rework':'Rework Required',
             'Rework required':'Rework Required',
+            'Rewok required':'Rework Required',
             'Rejected/Rwork':'Quality Rejected',
             'Cx is not interested':'Quality Cancelled',
             'Son Got the POA':'Quality Cancelled',
