@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Custom CSS for better KPI visibility - Fixed parameter name here
+# Custom CSS for better KPI visibility
 st.markdown("""
     <style>
     [data-testid="stMetricValue"] { font-size: 28px; }
@@ -32,10 +32,8 @@ def load_and_clean_data():
 
     # --- QUALITY STATUS CLEANUP ---
     if 'Quality status' in df.columns:
-        # 1. Basic formatting (remove spaces, make consistent)
         df['Quality status'] = df['Quality status'].astype(str).str.strip()
         
-        # 2. Define the Mapping (Fixes typos like 'Qulaity' and 'canclled')
         quality_map = {
             'approved': 'Approved',
             'Approved': 'Approved',
@@ -54,8 +52,6 @@ def load_and_clean_data():
             'Duplicate': 'Duplicate',
             'Dupliate': 'Duplicate'
         }
-        
-        # 3. Apply the mapping. If a value isn't in the map, keep it as is.
         df['Quality status'] = df['Quality status'].replace(quality_map)
 
     # Standardize other columns
@@ -67,46 +63,37 @@ def load_and_clean_data():
 
 try:
     df = load_and_clean_data()
-###################################
+
     # --- SIDEBAR FILTERS (UPGRADED) ---
     st.sidebar.header("Filter Panel")
-    
     st.sidebar.info("💡 **Tip:** Leave boxes empty to show ALL data.")
 
     # 1. AGENT FILTER
     st.sidebar.subheader("👤 Agent Filter")
     all_agents = sorted(df['Agent'].dropna().unique().tolist())
-    
     agent_mode = st.sidebar.radio("Agent Mode:", ["Include", "Exclude"], horizontal=True)
     selected_agents = st.sidebar.multiselect("Select Agents:", options=all_agents, placeholder="Showing All Agents...")
 
     # 2. MONTH FILTER
     st.sidebar.subheader("📅 Month Filter")
     all_months = df['Month'].dropna().unique().tolist()
-    
     month_mode = st.sidebar.radio("Month Mode:", ["Include", "Exclude"], horizontal=True)
     selected_months = st.sidebar.multiselect("Select Months:", options=all_months, placeholder="Showing All Months...")
 
     # --- APPLY FILTER LOGIC ---
     f_df = df.copy()
 
-    # Apply Agent Logic
-    if selected_agents: # Only filter if the user actually selected someone
+    if selected_agents:
         if agent_mode == "Include":
             f_df = f_df[f_df['Agent'].isin(selected_agents)]
-        else: # Exclude Mode
+        else:
             f_df = f_df[~f_df['Agent'].isin(selected_agents)]
 
-    # Apply Month Logic
-    if selected_months: # Only filter if the user actually selected a month
+    if selected_months:
         if month_mode == "Include":
             f_df = f_df[f_df['Month'].isin(selected_months)]
-        else: # Exclude Mode
+        else:
             f_df = f_df[~f_df['Month'].isin(selected_months)]
-
-    ################################
-    # Filter Application
-    f_df = df[(df['Agent'].isin(selected_agents)) & (df['Month'].isin(selected_months))]
 
     # --- TOP KPI METRICS ---
     st.subheader("Key Performance Indicators")
@@ -129,6 +116,19 @@ try:
         st.metric("Payments Accepted", p_acc)
 
     st.markdown("---")
+
+    # --- MONTHLY TREND (NEW SECTION) ---
+    st.subheader("📅 Monthly Revenue Trend")
+    if not f_df.empty:
+        # Grouping by month - keeping data order if possible
+        monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
+        fig_trend = px.line(
+            monthly_rev, x='Month', y='Amount', 
+            markers=True, text_auto='.2s',
+            labels={"Amount": "Revenue (£)"}
+        )
+        fig_trend.update_traces(line_color='#00CC96', line_width=3)
+        st.plotly_chart(fig_trend, use_container_width=True)
 
     # --- AGENT PERFORMANCE BREAKDOWN ---
     col_left, col_right = st.columns([2, 1])
