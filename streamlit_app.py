@@ -99,7 +99,7 @@ try:
 
     # 2. MONTH FILTER
     st.sidebar.subheader("📅 Month Filter")
-    all_months = df['Month'].dropna().unique().tolist()
+    all_months = df['Year'].dropna().unique().tolist()
     month_mode = st.sidebar.radio("Month Mode:", ["Include", "Exclude"], horizontal=True)
     selected_months = st.sidebar.multiselect("Select Months:", options=all_months, placeholder="Showing All Months...")
 
@@ -114,9 +114,9 @@ try:
 
     if selected_months:
         if month_mode == "Include":
-            f_df = f_df[f_df['Month'].isin(selected_months)]
+            f_df = f_df[f_df['Year'].isin(selected_months)]
         else:
-            f_df = f_df[~f_df['Month'].isin(selected_months)]
+            f_df = f_df[~f_df['Year'].isin(selected_months)]
 
     # --- TOP KPI METRICS ---
     st.subheader("Key Performance Indicators")
@@ -143,8 +143,8 @@ try:
     # --- MONTHLY TREND ---
     st.subheader("📅 Monthly Revenue Trend")
     if not f_df.empty:
-        monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
-        clean_month = monthly_rev['Month'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
+        monthly_rev = f_df.groupby('Year')['Amount'].sum().reset_index()
+        clean_month = monthly_rev['Year'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
         monthly_rev['DateOrder'] = pd.to_datetime(clean_month, format='%b-%Y', errors='coerce')
         monthly_rev = monthly_rev.dropna(subset=['DateOrder']).sort_values('DateOrder')
 
