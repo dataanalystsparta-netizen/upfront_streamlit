@@ -55,6 +55,7 @@ def load_and_clean_data():
             'Cancelled': 'Quality Cancelled',
             'Hold': 'Hold',
             'HOld': 'Hold',
+            'hold':'Hold',
             'Duplicate': 'Duplicate',
             'Dupliate': 'Duplicate'
         }
