@@ -22,7 +22,7 @@ st.markdown("---")
 
 # --- DATA CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1em-FmJ7m5LdyX8Az4ND4HKiFEIg9bCkzEd900e6rEG8/edit?gid=0#gid=0"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1uX9RrW7Z5ru4ljdK2D1os5Ao5KEBxkihMTDv6MVmzlQ/edit?gid=0#gid=0"
 
 @st.cache_data(ttl=300)
 def load_and_clean_data():
