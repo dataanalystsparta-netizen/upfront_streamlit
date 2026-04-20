@@ -192,7 +192,7 @@ try:
             st.plotly_chart(fig_rev, use_container_width=True)
 
     with col_right:
-        st.subheader("Quality Mix")
+        st.subheader("Quality Breakdown")
         if not f_df.empty:
             q_mix = f_df['Quality status'].value_counts().reset_index()
             names_col = q_mix.columns[0]
