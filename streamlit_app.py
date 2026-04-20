@@ -49,7 +49,7 @@ def load_and_clean_data():
             'Quality canclled': 'Quality Cancelled',
             'Qulaity cancelled': 'Quality Cancelled',
             'Qulality cancelled': 'Quality Cancelled',
-            'Cancelled': 'Cancelled',
+            'Cancelled': 'Quality Cancelled',
             'Hold': 'Hold',
             'Duplicate': 'Duplicate',
             'Dupliate': 'Duplicate'
