@@ -78,7 +78,7 @@ def load_and_clean_data():
         df['Reason of cancellation'] = df['Reason of cancellation'].str.title().replace('N/A', 'N/A')
 
     # Standardize other columns
-    for col in ['WlcmStatus', 'Payment Status']:
+    for col in ['Welcome Status', 'Payment Status']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
             
@@ -131,7 +131,7 @@ try:
         st.metric("Quality Approved", q_app)
 
     with kpi3:
-        w_done = len(f_df[f_df['WlcmStatus'].str.lower() == 'done'])
+        w_done = len(f_df[f_df['Welcome Status'].str.lower() == 'done'])
         st.metric("Welcome Done", w_done)
 
     with kpi4:
@@ -200,18 +200,18 @@ try:
         else:
             st.write("No cancellations found in the selected filter.")
 
-    # --- AGENT PERFORMANCE MATRIX ---
+    # --- AGENT PERFORMANCE MATRIX ---Welcome Status
     st.subheader("Agent-Wise Status Matrix")
     if not f_df.empty:
         matrix = f_df.groupby('Agent').agg({
             'Amount': 'sum',
             'Quality status': lambda x: (x.str.lower() == 'approved').sum(),
-            'WlcmStatus': lambda x: (x.str.lower() == 'done').sum(),
+            'Welcome Status': lambda x: (x.str.lower() == 'done').sum(),
             'Payment Status': lambda x: (x.str.lower() == 'accepted').sum()
         }).rename(columns={
             'Amount': 'Total Revenue (£)',
             'Quality status': 'Approved (Q)',
-            'WlcmStatus': 'Done (W)',
+            'Welcome Status': 'Done (W)',
             'Payment Status': 'Accepted (P)'
         }).sort_values(by='Total Revenue (£)', ascending=False).reset_index()
 
