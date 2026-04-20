@@ -27,15 +27,42 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1em-FmJ7m5LdyX8Az4ND4HKiFEIg
 @st.cache_data(ttl=300)
 def load_and_clean_data():
     df = conn.read(spreadsheet=SHEET_URL)
-    # Remove 'Total' row
     df = df[df['Agent'].astype(str).str.upper() != 'TOTAL']
-    # Clean numeric columns
     df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
-    # Standardize status columns
-    status_cols = ['Quality status', 'WlcmStatus', 'Payment Status']
-    for col in status_cols:
+
+    # --- QUALITY STATUS CLEANUP ---
+    if 'Quality status' in df.columns:
+        # 1. Basic formatting (remove spaces, make consistent)
+        df['Quality status'] = df['Quality status'].astype(str).str.strip()
+        
+        # 2. Define the Mapping (Fixes typos like 'Qulaity' and 'canclled')
+        quality_map = {
+            'approved': 'Approved',
+            'Approved': 'Approved',
+            'Rejected': 'Rejected',
+            'Quality rejected': 'Quality Rejected',
+            'Quality Rejected': 'Quality Rejected',
+            'Qulaity rejected': 'Quality Rejected',
+            'Qulality rejected': 'Quality Rejected',
+            'Quality cancelled': 'Quality Cancelled',
+            'Quality Cancelled': 'Quality Cancelled',
+            'Quality canclled': 'Quality Cancelled',
+            'Qulaity cancelled': 'Quality Cancelled',
+            'Qulality cancelled': 'Quality Cancelled',
+            'Cancelled': 'Cancelled',
+            'Hold': 'Hold',
+            'Duplicate': 'Duplicate',
+            'Dupliate': 'Duplicate'
+        }
+        
+        # 3. Apply the mapping. If a value isn't in the map, keep it as is.
+        df['Quality status'] = df['Quality status'].replace(quality_map)
+
+    # Standardize other columns
+    for col in ['WlcmStatus', 'Payment Status']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
+            
     return df
 
 try:
