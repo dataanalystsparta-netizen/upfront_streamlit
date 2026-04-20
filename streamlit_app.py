@@ -40,30 +40,44 @@ def load_and_clean_data():
 
 try:
     df = load_and_clean_data()
-
-    # --- SIDEBAR FILTERS ---
+###################################
+    # --- SIDEBAR FILTERS (UPGRADED) ---
     st.sidebar.header("Filter Panel")
+    
+    st.sidebar.info("💡 **Tip:** Leave boxes empty to show ALL data.")
 
-    # AGENT FILTER
+    # 1. AGENT FILTER
+    st.sidebar.subheader("👤 Agent Filter")
     all_agents = sorted(df['Agent'].dropna().unique().tolist())
-    sel_all_agents = st.sidebar.checkbox("Select All Agents", value=True)
     
-    if sel_all_agents:
-        selected_agents = st.sidebar.multiselect("Agents", options=all_agents, default=all_agents)
-    else:
-        selected_agents = st.sidebar.multiselect("Agents", options=all_agents)
+    agent_mode = st.sidebar.radio("Agent Mode:", ["Include", "Exclude"], horizontal=True)
+    selected_agents = st.sidebar.multiselect("Select Agents:", options=all_agents, placeholder="Showing All Agents...")
 
-    st.sidebar.markdown("---")
-
-    # MONTH FILTER
+    # 2. MONTH FILTER
+    st.sidebar.subheader("📅 Month Filter")
     all_months = df['Month'].dropna().unique().tolist()
-    sel_all_months = st.sidebar.checkbox("Select All Months", value=True)
     
-    if sel_all_months:
-        selected_months = st.sidebar.multiselect("Months", options=all_months, default=all_months)
-    else:
-        selected_months = st.sidebar.multiselect("Months", options=all_months)
+    month_mode = st.sidebar.radio("Month Mode:", ["Include", "Exclude"], horizontal=True)
+    selected_months = st.sidebar.multiselect("Select Months:", options=all_months, placeholder="Showing All Months...")
 
+    # --- APPLY FILTER LOGIC ---
+    f_df = df.copy()
+
+    # Apply Agent Logic
+    if selected_agents: # Only filter if the user actually selected someone
+        if agent_mode == "Include":
+            f_df = f_df[f_df['Agent'].isin(selected_agents)]
+        else: # Exclude Mode
+            f_df = f_df[~f_df['Agent'].isin(selected_agents)]
+
+    # Apply Month Logic
+    if selected_months: # Only filter if the user actually selected a month
+        if month_mode == "Include":
+            f_df = f_df[f_df['Month'].isin(selected_months)]
+        else: # Exclude Mode
+            f_df = f_df[~f_df['Month'].isin(selected_months)]
+
+    ################################
     # Filter Application
     f_df = df[(df['Agent'].isin(selected_agents)) & (df['Month'].isin(selected_months))]
 
