@@ -131,6 +131,11 @@ try:
         else:
             f_df = f_df[~f_df['Month'].isin(selected_months)]
 
+    # --- REVENUE COMPUTATION RULE ---
+    # Only compute Amount where Payment Status is Accepted. Set others to 0 for calculations.
+    if 'Payment Status' in f_df.columns:
+        f_df['Amount'] = f_df['Amount'].where(f_df['Payment Status'].str.lower() == 'accepted', 0)
+
     # --- TOP KPI METRICS ---
     st.subheader("Key Performance Indicators")
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -190,7 +195,6 @@ try:
         st.subheader("Quality Mix")
         if not f_df.empty:
             q_mix = f_df['Quality status'].value_counts().reset_index()
-            # Handle column naming in different plotly/pandas versions
             names_col = q_mix.columns[0]
             values_col = q_mix.columns[1]
             fig_pie = px.pie(q_mix, names=names_col, values=values_col, hole=0.4)
@@ -243,7 +247,6 @@ try:
                 (display_df['Phone No.'].astype(str).str.contains(search_query, na=False))
             ]
         
-        # Displaying with formatting
         st.dataframe(display_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
 
 except Exception as e:
