@@ -54,6 +54,10 @@ def load_and_clean_data():
         }
         df['Quality status'] = df['Quality status'].replace(quality_map)
 
+    # --- CANCELLATION REASON CLEANUP ---
+    if 'Reason of cancellation' in df.columns:
+        df['Reason of cancellation'] = df['Reason of cancellation'].astype(str).str.strip().replace(['nan', 'None', ''], 'N/A')
+
     # Standardize other columns
     for col in ['WlcmStatus', 'Payment Status']:
         if col in df.columns:
@@ -117,43 +121,25 @@ try:
 
     st.markdown("---")
 
-    # --- MONTHLY TREND (NEW SECTION) ---
-# --- MONTHLY TREND (FIXED) ---
-# --- MONTHLY TREND (CHRONOLOGICAL FIX) ---
-# --- MONTHLY TREND (THE ULTIMATE SORT FIX) ---
+    # --- MONTHLY TREND ---
     st.subheader("📅 Monthly Revenue Trend")
     if not f_df.empty:
-        # 1. Group the data
         monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
-        
-        # 2. Standardize abbreviations (Fixes 'Sept' -> 'Sep' and 'July' -> 'Jul')
         clean_month = monthly_rev['Month'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
-        
-        # 3. Create the helper date column
         monthly_rev['DateOrder'] = pd.to_datetime(clean_month, format='%b-%Y', errors='coerce')
-        
-        # 4. Sort and drop any rows that failed to parse (NaT)
         monthly_rev = monthly_rev.dropna(subset=['DateOrder']).sort_values('DateOrder')
 
-        # 5. Plot
         fig_trend = px.line(
             monthly_rev, x='Month', y='Amount', 
             markers=True, 
             text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"),
             labels={"Amount": "Revenue (£)"}
         )
-        
-        fig_trend.update_traces(
-            line_color='#00CC96', 
-            line_width=3,
-            textposition="top center"
-        )
-        
-        # CRITICAL: This forces Plotly to use our sorted dataframe order
+        fig_trend.update_traces(line_color='#00CC96', line_width=3, textposition="top center")
         fig_trend.update_xaxes(type='category', categoryorder='array', categoryarray=monthly_rev['Month'])
-        
         st.plotly_chart(fig_trend, use_container_width=True)
-    # --- AGENT PERFORMANCE BREAKDOWN ---
+
+    # --- AGENT PERFORMANCE & QUALITY MIX ---
     col_left, col_right = st.columns([2, 1])
 
     with col_left:
@@ -173,6 +159,28 @@ try:
             q_mix = f_df['Quality status'].value_counts().reset_index()
             fig_pie = px.pie(q_mix, names='Quality status', values='count', hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
+
+    # --- NEW: CANCELLATION REASON SUMMARY ---
+    st.subheader("🚫 Cancellation Reason Summary")
+    if not f_df.empty and 'Reason of cancellation' in f_df.columns:
+        # Filtering for rows that aren't Approved to see why they dropped
+        cancel_df = f_df[f_df['Quality status'] != 'Approved']
+        if not cancel_df.empty:
+            reason_counts = cancel_df['Reason of cancellation'].value_counts().reset_index()
+            reason_counts.columns = ['Reason', 'Count']
+            
+            fig_reasons = px.bar(
+                reason_counts.head(10), # Show top 10 reasons
+                y='Reason', x='Count',
+                orientation='h',
+                text_auto=True,
+                color='Count',
+                color_continuous_scale='Reds'
+            )
+            fig_reasons.update_layout(yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig_reasons, use_container_width=True)
+        else:
+            st.write("No cancellations found in the selected filter.")
 
     # --- AGENT PERFORMANCE MATRIX ---
     st.subheader("Agent-Wise Status Matrix")
