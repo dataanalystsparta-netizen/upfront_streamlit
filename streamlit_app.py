@@ -37,25 +37,27 @@ def load_and_clean_data():
     if 'Quality status' in df.columns:
         df['Quality status'] = df['Quality status'].astype(str).str.strip()
         
-        quality_map = {
-            'passed': 'Approved',
-            'Passed': 'Approved',
-            'approved': 'Approved',
-            'Approved': 'Approved',
-            'Rejected': 'Rejected',
-            'Quality rejected': 'Quality Rejected',
-            'Quality Rejected': 'Quality Rejected',
-            'Qulaity rejected': 'Quality Rejected',
-            'Qulality rejected': 'Quality Rejected',
-            'Quality cancelled': 'Quality Cancelled',
-            'Quality Cancelled': 'Quality Cancelled',
-            'Quality canclled': 'Quality Cancelled',
-            'Qulaity cancelled': 'Quality Cancelled',
-            'Qulality cancelled': 'Quality Cancelled',
-            'Cancelled': 'Quality Cancelled',
-            'Hold': 'Hold',
-            'Duplicate': 'Duplicate',
-            'Dupliate': 'Duplicate'
+    quality_map = {
+            # Approved variants
+            'passed': 'Approved', 'Passed': 'Approved', 'approved': 'Approved', 'Approved': 'Approved',
+            # Rejected variants
+            'Rejected': 'Rejected', 'Rejectet': 'Rejected', 'rejected': 'Rejected',
+            'Quality rejected': 'Quality Rejected', 'Quality Rejected': 'Quality Rejected',
+            'Qulaity rejected': 'Quality Rejected', 'Qulality rejected': 'Quality Rejected',
+            'Qulality rejected': 'Quality Rejected', 'Qulaity rejected': 'Quality Rejected',
+            # Hold variants
+            'Hold': 'Hold', 'hold': 'Hold', 'HOld': 'Hold',
+            # Rework variants
+            'Rework': 'Rework', 'Rework required': 'Rework Required', 'Rewok required': 'Rework Required',
+            'Rework Required': 'Rework Required', 'Rejected/Rwork': 'Rework Required',
+            # Cancelled variants
+            'Cancelled': 'Quality Cancelled', 'cancelled': 'Quality Cancelled', 'Cancel': 'Quality Cancelled',
+            'Quality cancelled': 'Quality Cancelled', 'Quality Cancelled': 'Quality Cancelled',
+            'Qulaity cancelled': 'Quality Cancelled', 'Qulality cancelled': 'Quality Cancelled',
+            # Duplicate variants
+            'Duplicate': 'Duplicate', 'Dupliate': 'Duplicate', 'Duplicate/Rejected': 'Duplicate',
+            # Misc
+            'Son Got the POA': 'Hold (POA)', 'Cx is not interested': 'Not Interested'
         }
         df['Quality status'] = df['Quality status'].replace(quality_map)
 
