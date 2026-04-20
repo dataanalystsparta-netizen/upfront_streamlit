@@ -22,12 +22,15 @@ st.markdown("---")
 
 # --- DATA CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
+# UPDATED NEW SHEET URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1uX9RrW7Z5ru4ljdK2D1os5Ao5KEBxkihMTDv6MVmzlQ/edit?gid=0#gid=0"
 
 @st.cache_data(ttl=300)
 def load_and_clean_data():
     df = conn.read(spreadsheet=SHEET_URL)
+    # Exclude total rows
     df = df[df['Agent'].astype(str).str.upper() != 'TOTAL']
+    # Convert Amount to numeric
     df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
 
     # --- QUALITY STATUS CLEANUP ---
@@ -35,6 +38,8 @@ def load_and_clean_data():
         df['Quality status'] = df['Quality status'].astype(str).str.strip()
         
         quality_map = {
+            'passed': 'Approved',
+            'Passed': 'Approved',
             'approved': 'Approved',
             'Approved': 'Approved',
             'Rejected': 'Rejected',
@@ -56,10 +61,8 @@ def load_and_clean_data():
 
     # --- CANCELLATION REASON CLEANUP ---
     if 'Reason of cancellation' in df.columns:
-        # Standardize whitespace and casing
         df['Reason of cancellation'] = df['Reason of cancellation'].astype(str).str.strip()
         
-        # Explicit mapping for known duplicates/typos
         reason_map = {
             'Family interference': 'Family Interference',
             'Family Interference': 'Family Interference',
@@ -68,17 +71,16 @@ def load_and_clean_data():
             'Improper sale': 'Improper Sale',
             'Not for sale': 'Not For Sale',
             'Invalid account details': 'Invalid Account Details',
+            'Not intersted': 'Not Interested',  # Fix typo from sample data
             'nan': 'N/A',
             'None': 'N/A',
             '': 'N/A'
         }
         df['Reason of cancellation'] = df['Reason of cancellation'].replace(reason_map)
-        
-        # Final touch: Title Case for anything else missed
         df['Reason of cancellation'] = df['Reason of cancellation'].str.title().replace('N/A', 'N/A')
 
     # Standardize other columns
-    for col in ['Welcome Status', 'Payment Status']:
+    for col in ['Welcome Status', 'Payment Status', 'Month']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
             
@@ -87,10 +89,9 @@ def load_and_clean_data():
 try:
     df = load_and_clean_data()
 
-    # --- SIDEBAR FILTERS (UPGRADED) ---
+    # --- SIDEBAR FILTERS ---
     st.sidebar.header("Filter Panel")
-    st.sidebar.info("💡 **Tip:** Leave boxes empty to show ALL data.")
-
+    
     # 1. AGENT FILTER
     st.sidebar.subheader("👤 Agent Filter")
     all_agents = sorted(df['Agent'].dropna().unique().tolist())
@@ -99,7 +100,7 @@ try:
 
     # 2. MONTH FILTER
     st.sidebar.subheader("📅 Month Filter")
-    all_months = df['Year'].dropna().unique().tolist()
+    all_months = df['Month'].dropna().unique().tolist() if 'Month' in df.columns else []
     month_mode = st.sidebar.radio("Month Mode:", ["Include", "Exclude"], horizontal=True)
     selected_months = st.sidebar.multiselect("Select Months:", options=all_months, placeholder="Showing All Months...")
 
@@ -114,9 +115,9 @@ try:
 
     if selected_months:
         if month_mode == "Include":
-            f_df = f_df[f_df['Year'].isin(selected_months)]
+            f_df = f_df[f_df['Month'].isin(selected_months)]
         else:
-            f_df = f_df[~f_df['Year'].isin(selected_months)]
+            f_df = f_df[~f_df['Month'].isin(selected_months)]
 
     # --- TOP KPI METRICS ---
     st.subheader("Key Performance Indicators")
@@ -127,7 +128,8 @@ try:
         st.metric("Total Revenue", f"£{total_revenue:,.2f}")
 
     with kpi2:
-        q_app = len(f_df[f_df['Quality status'].str.lower() == 'approved'])
+        # Using the cleaned 'Approved' value
+        q_app = len(f_df[f_df['Quality status'] == 'Approved'])
         st.metric("Quality Approved", q_app)
 
     with kpi3:
@@ -141,22 +143,24 @@ try:
     st.markdown("---")
 
     # --- MONTHLY TREND ---
-    st.subheader("📅 Monthly Revenue Trend")
-    if not f_df.empty:
-        monthly_rev = f_df.groupby('Year')['Amount'].sum().reset_index()
-        clean_month = monthly_rev['Year'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
+    if 'Month' in f_df.columns and not f_df.empty:
+        st.subheader("📅 Monthly Revenue Trend")
+        monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
+        # Handle custom month formatting
+        clean_month = monthly_rev['Month'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
         monthly_rev['DateOrder'] = pd.to_datetime(clean_month, format='%b-%Y', errors='coerce')
         monthly_rev = monthly_rev.dropna(subset=['DateOrder']).sort_values('DateOrder')
 
-        fig_trend = px.line(
-            monthly_rev, x='Month', y='Amount', 
-            markers=True, 
-            text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"),
-            labels={"Amount": "Revenue (£)"}
-        )
-        fig_trend.update_traces(line_color='#00CC96', line_width=3, textposition="top center")
-        fig_trend.update_xaxes(type='category', categoryorder='array', categoryarray=monthly_rev['Month'])
-        st.plotly_chart(fig_trend, use_container_width=True)
+        if not monthly_rev.empty:
+            fig_trend = px.line(
+                monthly_rev, x='Month', y='Amount', 
+                markers=True, 
+                text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"),
+                labels={"Amount": "Revenue (£)"}
+            )
+            fig_trend.update_traces(line_color='#00CC96', line_width=3, textposition="top center")
+            fig_trend.update_xaxes(type='category', categoryorder='array', categoryarray=monthly_rev['Month'])
+            st.plotly_chart(fig_trend, use_container_width=True)
 
     # --- AGENT PERFORMANCE & QUALITY MIX ---
     col_left, col_right = st.columns([2, 1])
@@ -176,7 +180,7 @@ try:
         st.subheader("Quality Mix")
         if not f_df.empty:
             q_mix = f_df['Quality status'].value_counts().reset_index()
-            fig_pie = px.pie(q_mix, names='Quality status', values='count', hole=0.4)
+            fig_pie = px.pie(q_mix, names='index' if 'index' in q_mix.columns else 'Quality status', values='count' if 'count' in q_mix.columns else 'Quality status', hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
 
     # --- CANCELLATION REASON SUMMARY ---
@@ -198,14 +202,14 @@ try:
             fig_reasons.update_layout(yaxis={'categoryorder':'total ascending'})
             st.plotly_chart(fig_reasons, use_container_width=True)
         else:
-            st.write("No cancellations found in the selected filter.")
+            st.write("No cancellations found in current selection.")
 
-    # --- AGENT PERFORMANCE MATRIX ---Welcome Status
+    # --- AGENT PERFORMANCE MATRIX ---
     st.subheader("Agent-Wise Status Matrix")
     if not f_df.empty:
         matrix = f_df.groupby('Agent').agg({
             'Amount': 'sum',
-            'Quality status': lambda x: (x.str.lower() == 'approved').sum(),
+            'Quality status': lambda x: (x == 'Approved').sum(),
             'Welcome Status': lambda x: (x.str.lower() == 'done').sum(),
             'Payment Status': lambda x: (x.str.lower() == 'accepted').sum()
         }).rename(columns={
@@ -217,13 +221,13 @@ try:
 
         st.dataframe(matrix, use_container_width=True, hide_index=True)
 
-    # --- SEARCH & EXPORT ---
+    # --- SEARCH ---
     with st.expander("🔍 Search Transaction Details"):
         search_query = st.text_input("Search by Customer Name or Phone Number")
         if search_query:
             search_df = f_df[
                 (f_df['Customer Name'].str.contains(search_query, case=False, na=False)) |
-                (f_df['PhoneNo.'].astype(str).str.contains(search_query, na=False))
+                (f_df['Phone No.'].astype(str).str.contains(search_query, na=False))
             ]
             st.dataframe(search_df, use_container_width=True)
         else:
