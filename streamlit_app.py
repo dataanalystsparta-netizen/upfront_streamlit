@@ -4,85 +4,99 @@ import pandas as pd
 import plotly.express as px
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Sparta Telecom Upfront Dashboard", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Agent Performance Dashboard", layout="wide", page_icon="📈")
 
-st.title("📊 Upfront Sales & Quality Dashboard")
+st.title("📈 Agent-Wise Status & Revenue Dashboard")
 st.markdown("---")
 
 # --- DATA CONNECTION ---
-# Connect to Google Sheets securely
 conn = st.connection("gsheets", type=GSheetsConnection)
-
-# Your specific sheet URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1em-FmJ7m5LdyX8Az4ND4HKiFEIg9bCkzEd900e6rEG8/edit#gid=0"
 
-@st.cache_data(ttl=600) # Caches data for 10 minutes to ensure fast loading
+@st.cache_data(ttl=300) # Refresh data every 5 minutes
 def load_data():
-    return conn.read(spreadsheet=SHEET_URL)
+    data = conn.read(spreadsheet=SHEET_URL)
+    # Remove the 'Total' row from raw data to prevent double-counting in aggregations
+    data = data[data['Agent'].str.upper() != 'TOTAL']
+    # Ensure Amount is numeric
+    data['Amount'] = pd.to_numeric(data['Amount'], errors='coerce').fillna(0)
+    return data
 
 try:
-    # Load and clean data
     df = load_data()
-    
-    # Ensure Amount is treated as a number for calculations
-    df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
-    
+
     # --- SIDEBAR FILTERS ---
-    st.sidebar.header("Dashboard Filters")
+    st.sidebar.header("Filters")
     
     # Agent Filter
-    agents = df['Agent'].dropna().unique().tolist()
+    agents = sorted(df['Agent'].dropna().unique().tolist())
     selected_agents = st.sidebar.multiselect("Select Agent", options=agents, default=agents)
     
-    # Portal Filter (Sparta / Reliable)
-    portals = df['Portal Name'].dropna().unique().tolist()
-    selected_portals = st.sidebar.multiselect("Select Portal", options=portals, default=portals)
-    
-    # Quality Status Filter
-    statuses = df['Quality status'].dropna().unique().tolist()
-    selected_statuses = st.sidebar.multiselect("Quality Status", options=statuses, default=statuses)
+    # Month Filter
+    months = df['Month'].dropna().unique().tolist()
+    selected_months = st.sidebar.multiselect("Select Month", options=months, default=months)
 
-    # Apply Filters
-    filtered_df = df[
-        (df['Agent'].isin(selected_agents)) & 
-        (df['Portal Name'].isin(selected_portals)) &
-        (df['Quality status'].isin(selected_statuses))
-    ]
-    
-    # --- TOP KPI METRICS ---
-    # We dynamically calculate these based on the active filters
-    total_revenue = filtered_df['Amount'].sum()
-    total_sales_count = len(filtered_df)
-    approved_count = len(filtered_df[filtered_df['Quality status'] == 'Approved'])
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label="Total Revenue", value=f"£{total_revenue:,.2f}")
-    col2.metric(label="Total Sales Volume", value=total_sales_count)
-    col3.metric(label="Approved Sales", value=approved_count)
-    
+    # Filtered Dataframe
+    f_df = df[(df['Agent'].isin(selected_agents)) & (df['Month'].isin(selected_months))]
+
+    # --- TOP KPI METRICS (4 Columns) ---
+    col1, col2, col3, col4 = st.columns(4)
+
+    # 1. Total Revenue
+    total_rev = f_df['Amount'].sum()
+    col1.metric("Total Revenue", f"£{total_rev:,.2f}")
+
+    # 2. Quality Status (Focus on 'Approved')
+    q_approved = len(f_df[f_df['Quality status'].str.contains('Approved', na=False, case=False)])
+    col2.metric("Quality Approved", q_approved)
+
+    # 3. Welcome Status (Focus on 'Done' or 'Approved')
+    w_done = len(f_df[f_df['WlcmStatus'].str.contains('Done', na=False, case=False)])
+    col3.metric("Welcome Done", w_done)
+
+    # 4. Payment Status (Focus on 'Accepted')
+    p_accepted = len(f_df[f_df['Payment Status'].str.contains('Accepted', na=False, case=False)])
+    col4.metric("Payments Accepted", p_accepted)
+
     st.markdown("---")
-    
-    # --- VISUALIZATIONS ---
-    col_chart1, col_chart2 = st.columns(2)
-    
-    with col_chart1:
-        st.subheader("Revenue by Agent")
-        if not filtered_df.empty:
-            # Group by agent and sum the amounts
-            agent_rev = filtered_df.groupby('Agent')['Amount'].sum().reset_index()
-            fig_agent = px.bar(agent_rev, x='Agent', y='Amount', color='Agent', text_auto='.2s')
-            st.plotly_chart(fig_agent, use_container_width=True)
-            
-    with col_chart2:
-        st.subheader("Sales Volume by Portal")
-        if not filtered_df.empty:
-            fig_portal = px.pie(filtered_df, names='Portal Name', hole=0.4)
-            st.plotly_chart(fig_portal, use_container_width=True)
 
-    # --- DATA GRID ---
-    st.subheader("Transaction Details")
-    # Display the filtered dataframe
-    st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+    # --- AGENT-WISE BREAKDOWN CHARTS ---
+    chart_col1, chart_col2 = st.columns(2)
+
+    with chart_col1:
+        st.subheader("Revenue by Agent")
+        rev_by_agent = f_df.groupby('Agent')['Amount'].sum().sort_values(ascending=False).reset_index()
+        fig_rev = px.bar(rev_by_agent, x='Agent', y='Amount', text_auto='.2s', color_discrete_sequence=['#00CC96'])
+        st.plotly_chart(fig_rev, use_container_width=True)
+
+    with chart_col2:
+        st.subheader("Quality Status Distribution")
+        # Breakdown of different quality statuses (Approved, Cancelled, etc.)
+        q_dist = f_df['Quality status'].value_counts().reset_index()
+        fig_q = px.pie(q_dist, names='Quality status', values='count', hole=0.4)
+        st.plotly_chart(fig_q, use_container_width=True)
+
+    # --- DETAILED AGENT STATUS TABLE ---
+    st.subheader("Agent Performance Matrix")
+    
+    # Create a pivot-style summary for each agent
+    agent_summary = f_df.groupby('Agent').agg({
+        'Amount': 'sum',
+        'Quality status': lambda x: (x == 'Approved').sum(),
+        'WlcmStatus': lambda x: (x == 'Done').sum(),
+        'Payment Status': lambda x: (x == 'Accepted').sum()
+    }).rename(columns={
+        'Amount': 'Total Revenue',
+        'Quality status': 'Approved (Quality)',
+        'WlcmStatus': 'Done (Welcome)',
+        'Payment Status': 'Accepted (Payment)'
+    }).reset_index()
+
+    st.dataframe(agent_summary, use_container_width=True, hide_index=True)
+
+    # --- FULL DATA VIEW ---
+    with st.expander("View Raw Filtered Transactions"):
+        st.dataframe(f_df, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Unable to connect to data source: {e}")
+    st.error(f"Error loading dashboard: {e}")
