@@ -120,18 +120,22 @@ try:
     # --- MONTHLY TREND (NEW SECTION) ---
 # --- MONTHLY TREND (FIXED) ---
 # --- MONTHLY TREND (CHRONOLOGICAL FIX) ---
+# --- MONTHLY TREND (THE ULTIMATE SORT FIX) ---
     st.subheader("📅 Monthly Revenue Trend")
     if not f_df.empty:
         # 1. Group the data
         monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
         
-        # 2. Create a helper column to sort correctly (e.g., "Sept-2025" -> 2025-09-01)
-        monthly_rev['DateOrder'] = pd.to_datetime(monthly_rev['Month'], format='%b-%Y', errors='coerce')
+        # 2. Standardize abbreviations (Fixes 'Sept' -> 'Sep' and 'July' -> 'Jul')
+        clean_month = monthly_rev['Month'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
         
-        # 3. Sort by that date helper
-        monthly_rev = monthly_rev.sort_values('DateOrder')
+        # 3. Create the helper date column
+        monthly_rev['DateOrder'] = pd.to_datetime(clean_month, format='%b-%Y', errors='coerce')
+        
+        # 4. Sort and drop any rows that failed to parse (NaT)
+        monthly_rev = monthly_rev.dropna(subset=['DateOrder']).sort_values('DateOrder')
 
-        # 4. Plot using the sorted dataframe
+        # 5. Plot
         fig_trend = px.line(
             monthly_rev, x='Month', y='Amount', 
             markers=True, 
@@ -145,8 +149,8 @@ try:
             textposition="top center"
         )
         
-        # Ensure Plotly doesn't try to re-sort alphabetically
-        fig_trend.update_xaxes(type='category')
+        # CRITICAL: This forces Plotly to use our sorted dataframe order
+        fig_trend.update_xaxes(type='category', categoryorder='array', categoryarray=monthly_rev['Month'])
         
         st.plotly_chart(fig_trend, use_container_width=True)
     # --- AGENT PERFORMANCE BREAKDOWN ---
