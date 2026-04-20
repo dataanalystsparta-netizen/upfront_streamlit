@@ -56,7 +56,11 @@ def load_and_clean_data():
             'Cancel':'Quality Cancelled',
             'cancelled': 'Quality Cancelled',
             'Rework':'Rework Required',
-            'Re'
+            'Rework required':'Rework Required',
+            'Rejected/Rwork':'Quality Rejected',
+            'Cx is not interested':'Quality Cancelled',
+            'Son Got the POA':'Quality Cancelled',
+            
             'Hold': 'Hold',
             'HOld': 'Hold',
             'hold':'Hold',
