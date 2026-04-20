@@ -10,12 +10,12 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Custom CSS for better KPI visibility
+# Custom CSS for better KPI visibility - Fixed parameter name here
 st.markdown("""
     <style>
     [data-testid="stMetricValue"] { font-size: 28px; }
     </style>
-    """, unsafe_allow_value=True)
+    """, unsafe_allow_html=True)
 
 st.title("📊 Upfront Sales & Quality Dashboard")
 st.markdown("---")
@@ -24,29 +24,24 @@ st.markdown("---")
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1em-FmJ7m5LdyX8Az4ND4HKiFEIg9bCkzEd900e6rEG8/edit#gid=0"
 
-@st.cache_data(ttl=300)  # Refresh every 5 minutes
+@st.cache_data(ttl=300)
 def load_and_clean_data():
-    # Read the data from the synced Google Sheet
     df = conn.read(spreadsheet=SHEET_URL)
-    
-    # 1. Drop the 'Total' row if it exists in the data to avoid double counting
+    # Remove 'Total' row
     df = df[df['Agent'].astype(str).str.upper() != 'TOTAL']
-    
-    # 2. Clean numeric columns
+    # Clean numeric columns
     df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
-    
-    # 3. Standardize status columns for easier filtering
+    # Standardize status columns
     status_cols = ['Quality status', 'WlcmStatus', 'Payment Status']
     for col in status_cols:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
-            
     return df
 
 try:
     df = load_and_clean_data()
 
-    # --- SIDEBAR FILTERS (SIMPLIFIED) ---
+    # --- SIDEBAR FILTERS ---
     st.sidebar.header("Filter Panel")
 
     # AGENT FILTER
@@ -70,8 +65,7 @@ try:
         selected_months = st.sidebar.multiselect("Months", options=all_months)
 
     # Filter Application
-    mask = (df['Agent'].isin(selected_agents)) & (df['Month'].isin(selected_months))
-    f_df = df[mask]
+    f_df = df[(df['Agent'].isin(selected_agents)) & (df['Month'].isin(selected_months))]
 
     # --- TOP KPI METRICS ---
     st.subheader("Key Performance Indicators")
@@ -82,17 +76,14 @@ try:
         st.metric("Total Revenue", f"£{total_revenue:,.2f}")
 
     with kpi2:
-        # Quality Status: Approved
         q_app = len(f_df[f_df['Quality status'].str.lower() == 'approved'])
         st.metric("Quality Approved", q_app)
 
     with kpi3:
-        # Welcome Status: Done
         w_done = len(f_df[f_df['WlcmStatus'].str.lower() == 'done'])
         st.metric("Welcome Done", w_done)
 
     with kpi4:
-        # Payment Status: Accepted
         p_acc = len(f_df[f_df['Payment Status'].str.lower() == 'accepted'])
         st.metric("Payments Accepted", p_acc)
 
@@ -103,37 +94,38 @@ try:
 
     with col_left:
         st.subheader("Revenue by Agent")
-        rev_chart = f_df.groupby('Agent')['Amount'].sum().sort_values(ascending=False).reset_index()
-        fig_rev = px.bar(
-            rev_chart, x='Agent', y='Amount', 
-            text_auto='.2s', color='Amount',
-            color_continuous_scale='Greens'
-        )
-        st.plotly_chart(fig_rev, use_container_width=True)
+        if not f_df.empty:
+            rev_chart = f_df.groupby('Agent')['Amount'].sum().sort_values(ascending=False).reset_index()
+            fig_rev = px.bar(
+                rev_chart, x='Agent', y='Amount', 
+                text_auto='.2s', color='Amount',
+                color_continuous_scale='Greens'
+            )
+            st.plotly_chart(fig_rev, use_container_width=True)
 
     with col_right:
         st.subheader("Quality Mix")
-        q_mix = f_df['Quality status'].value_counts().reset_index()
-        fig_pie = px.pie(q_mix, names='Quality status', values='count', hole=0.4)
-        st.plotly_chart(fig_pie, use_container_width=True)
+        if not f_df.empty:
+            q_mix = f_df['Quality status'].value_counts().reset_index()
+            fig_pie = px.pie(q_mix, names='Quality status', values='count', hole=0.4)
+            st.plotly_chart(fig_pie, use_container_width=True)
 
     # --- AGENT PERFORMANCE MATRIX ---
     st.subheader("Agent-Wise Status Matrix")
-    
-    # Aggregating all statuses by agent
-    matrix = f_df.groupby('Agent').agg({
-        'Amount': 'sum',
-        'Quality status': lambda x: (x.str.lower() == 'approved').sum(),
-        'WlcmStatus': lambda x: (x.str.lower() == 'done').sum(),
-        'Payment Status': lambda x: (x.str.lower() == 'accepted').sum()
-    }).rename(columns={
-        'Amount': 'Total Revenue (£)',
-        'Quality status': 'Approved (Q)',
-        'WlcmStatus': 'Done (W)',
-        'Payment Status': 'Accepted (P)'
-    }).sort_values(by='Total Revenue (£)', ascending=False).reset_index()
+    if not f_df.empty:
+        matrix = f_df.groupby('Agent').agg({
+            'Amount': 'sum',
+            'Quality status': lambda x: (x.str.lower() == 'approved').sum(),
+            'WlcmStatus': lambda x: (x.str.lower() == 'done').sum(),
+            'Payment Status': lambda x: (x.str.lower() == 'accepted').sum()
+        }).rename(columns={
+            'Amount': 'Total Revenue (£)',
+            'Quality status': 'Approved (Q)',
+            'WlcmStatus': 'Done (W)',
+            'Payment Status': 'Accepted (P)'
+        }).sort_values(by='Total Revenue (£)', ascending=False).reset_index()
 
-    st.dataframe(matrix, use_container_width=True, hide_index=True)
+        st.dataframe(matrix, use_container_width=True, hide_index=True)
 
     # --- SEARCH & EXPORT ---
     with st.expander("🔍 Search Transaction Details"):
@@ -148,5 +140,4 @@ try:
             st.dataframe(f_df, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Something went wrong while loading the dashboard: {e}")
-    st.info("Check if your Google Sheet is shared with the Service Account email.")
+    st.error(f"Error: {e}")
