@@ -119,24 +119,34 @@ try:
 
     # --- MONTHLY TREND (NEW SECTION) ---
 # --- MONTHLY TREND (FIXED) ---
+# --- MONTHLY TREND (CHRONOLOGICAL FIX) ---
     st.subheader("📅 Monthly Revenue Trend")
     if not f_df.empty:
+        # 1. Group the data
         monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
         
-        # Use 'text' instead of 'text_auto' for line charts
+        # 2. Create a helper column to sort correctly (e.g., "Sept-2025" -> 2025-09-01)
+        monthly_rev['DateOrder'] = pd.to_datetime(monthly_rev['Month'], format='%b-%Y', errors='coerce')
+        
+        # 3. Sort by that date helper
+        monthly_rev = monthly_rev.sort_values('DateOrder')
+
+        # 4. Plot using the sorted dataframe
         fig_trend = px.line(
             monthly_rev, x='Month', y='Amount', 
             markers=True, 
-            text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"), # Formats labels as £1k, etc.
+            text=monthly_rev['Amount'].apply(lambda x: f"£{x:,.0f}"),
             labels={"Amount": "Revenue (£)"}
         )
         
-        # Position the text above the markers
         fig_trend.update_traces(
             line_color='#00CC96', 
             line_width=3,
             textposition="top center"
         )
+        
+        # Ensure Plotly doesn't try to re-sort alphabetically
+        fig_trend.update_xaxes(type='category')
         
         st.plotly_chart(fig_trend, use_container_width=True)
     # --- AGENT PERFORMANCE BREAKDOWN ---
