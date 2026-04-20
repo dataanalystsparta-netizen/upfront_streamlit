@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -22,7 +23,6 @@ st.markdown("---")
 
 # --- DATA CONNECTION ---
 conn = st.connection("gsheets", type=GSheetsConnection)
-# UPDATED NEW SHEET URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1uX9RrW7Z5ru4ljdK2D1os5Ao5KEBxkihMTDv6MVmzlQ/edit?gid=0#gid=0"
 
 @st.cache_data(ttl=300)
@@ -30,63 +30,42 @@ def load_and_clean_data():
     df = conn.read(spreadsheet=SHEET_URL)
     # Exclude total rows
     df = df[df['Agent'].astype(str).str.upper() != 'TOTAL']
+    
+    # --- DATE CLEANING ---
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
     # Convert Amount to numeric
     df['Amount'] = pd.to_numeric(df['Amount'], errors='coerce').fillna(0)
 
     # --- QUALITY STATUS CLEANUP ---
     if 'Quality status' in df.columns:
         df['Quality status'] = df['Quality status'].astype(str).str.strip()
-        
         quality_map = {
-            'passed': 'Approved',
-            'Passed': 'Approved',
-            'approved': 'Approved',
-            'Approved': 'Approved',
-            'Rejected': 'Quality Rejected',
-            'Rejectet': 'Quality Rejected',
-            'Cancelled':'Quality Cancelled',
-            'Quality rejected': 'Quality Rejected',
-            'Quality Rejected': 'Quality Rejected',
-            'Qulaity rejected': 'Quality Rejected',
-            'Qulality rejected': 'Quality Rejected',
-            'Quality cancelled': 'Quality Cancelled',
-            'Quality Cancelled': 'Quality Cancelled',
-            'Quality canclled': 'Quality Cancelled',
-            'Qulaity cancelled': 'Quality Cancelled',
-            'Qulality cancelled': 'Quality Cancelled',
-            'Cancel':'Quality Cancelled',
-            'cancelled': 'Quality Cancelled',
-            'Rework':'Rework Required',
-            'Rework required':'Rework Required',
-            'Rewok required':'Rework Required',
-            'Rejected/Rwork':'Quality Rejected',
-            'Cx is not interested':'Quality Cancelled',
-            'Son Got the POA':'Quality Cancelled',
-            'Duplicate/Rejected':'Duplicate',
-            'Hold': 'Hold',
-            'HOld': 'Hold',
-            'hold':'Hold',
-            'Duplicate': 'Duplicate',
-            'Dupliate': 'Duplicate'
+            'passed': 'Approved', 'Passed': 'Approved', 'approved': 'Approved', 'Approved': 'Approved',
+            'Rejected': 'Quality Rejected', 'Rejectet': 'Quality Rejected', 'Cancelled':'Quality Cancelled',
+            'Quality rejected': 'Quality Rejected', 'Quality Rejected': 'Quality Rejected',
+            'Qulaity rejected': 'Quality Rejected', 'Qulality rejected': 'Quality Rejected',
+            'Quality cancelled': 'Quality Cancelled', 'Quality Cancelled': 'Quality Cancelled',
+            'Quality canclled': 'Quality Cancelled', 'Qulaity cancelled': 'Quality Cancelled',
+            'Qulality cancelled': 'Quality Cancelled', 'Cancel':'Quality Cancelled',
+            'cancelled': 'Quality Cancelled', 'Rework':'Rework Required',
+            'Rework required':'Rework Required', 'Rewok required':'Rework Required',
+            'Rejected/Rwork':'Quality Rejected', 'Cx is not interested':'Quality Cancelled',
+            'Son Got the POA':'Quality Cancelled', 'Duplicate/Rejected':'Duplicate',
+            'Hold': 'Hold', 'HOld': 'Hold', 'hold':'Hold', 'Duplicate': 'Duplicate', 'Dupliate': 'Duplicate'
         }
         df['Quality status'] = df['Quality status'].replace(quality_map)
 
     # --- CANCELLATION REASON CLEANUP ---
     if 'Reason of cancellation' in df.columns:
         df['Reason of cancellation'] = df['Reason of cancellation'].astype(str).str.strip()
-        
         reason_map = {
-            'Family interference': 'Family Interference',
-            'Family Interference': 'Family Interference',
-            'Inbound cancel': 'Inbound Cancel',
-            'Inbound Cancel': 'Inbound Cancel',
-            'Improper sale': 'Improper Sale',
-            'Not for sale': 'Not For Sale',
-            'Invalid account details': 'Invalid Account Details',
-            'Not intersted': 'Not Interested',  # Fix typo from sample data
-            'nan': 'N/A',
-            'None': 'N/A',
-            '': 'N/A'
+            'Family interference': 'Family Interference', 'Family Interference': 'Family Interference',
+            'Inbound cancel': 'Inbound Cancel', 'Inbound Cancel': 'Inbound Cancel',
+            'Improper sale': 'Improper Sale', 'Not for sale': 'Not For Sale',
+            'Invalid account details': 'Invalid Account Details', 'Not intersted': 'Not Interested',
+            'nan': 'N/A', 'None': 'N/A', '': 'N/A'
         }
         df['Reason of cancellation'] = df['Reason of cancellation'].replace(reason_map)
         df['Reason of cancellation'] = df['Reason of cancellation'].str.title().replace('N/A', 'N/A')
@@ -104,14 +83,29 @@ try:
     # --- SIDEBAR FILTERS ---
     st.sidebar.header("Filter Panel")
     
-    # 1. AGENT FILTER
+    # 1. DATE RANGE FILTER
+    st.sidebar.subheader("📅 Date Range Filter")
+    if 'Date' in df.columns and not df['Date'].dropna().empty:
+        min_date = df['Date'].min().date()
+        max_date = df['Date'].max().date()
+        
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            start_date = st.date_input("From", min_date, min_value=min_date, max_value=max_date)
+        with col2:
+            end_date = st.date_input("To", max_date, min_value=min_date, max_value=max_date)
+    else:
+        st.sidebar.warning("Date column missing or empty.")
+        start_date, end_date = None, None
+
+    # 2. AGENT FILTER
     st.sidebar.subheader("👤 Agent Filter")
     all_agents = sorted(df['Agent'].dropna().unique().tolist())
     agent_mode = st.sidebar.radio("Agent Mode:", ["Include", "Exclude"], horizontal=True)
     selected_agents = st.sidebar.multiselect("Select Agents:", options=all_agents, placeholder="Showing All Agents...")
 
-    # 2. MONTH FILTER
-    st.sidebar.subheader("📅 Month Filter")
+    # 3. MONTH FILTER
+    st.sidebar.subheader("🗓️ Month Filter")
     all_months = df['Month'].dropna().unique().tolist() if 'Month' in df.columns else []
     month_mode = st.sidebar.radio("Month Mode:", ["Include", "Exclude"], horizontal=True)
     selected_months = st.sidebar.multiselect("Select Months:", options=all_months, placeholder="Showing All Months...")
@@ -119,12 +113,18 @@ try:
     # --- APPLY FILTER LOGIC ---
     f_df = df.copy()
 
+    # Apply Date Filter
+    if start_date and end_date:
+        f_df = f_df[(f_df['Date'].dt.date >= start_date) & (f_df['Date'].dt.date <= end_date)]
+
+    # Apply Agent Filter
     if selected_agents:
         if agent_mode == "Include":
             f_df = f_df[f_df['Agent'].isin(selected_agents)]
         else:
             f_df = f_df[~f_df['Agent'].isin(selected_agents)]
 
+    # Apply Month Filter
     if selected_months:
         if month_mode == "Include":
             f_df = f_df[f_df['Month'].isin(selected_months)]
@@ -140,7 +140,6 @@ try:
         st.metric("Total Revenue", f"£{total_revenue:,.2f}")
 
     with kpi2:
-        # Using the cleaned 'Approved' value
         q_app = len(f_df[f_df['Quality status'] == 'Approved'])
         st.metric("Quality Approved", f"{q_app:,}")
 
@@ -158,7 +157,6 @@ try:
     if 'Month' in f_df.columns and not f_df.empty:
         st.subheader("📅 Monthly Revenue Trend")
         monthly_rev = f_df.groupby('Month')['Amount'].sum().reset_index()
-        # Handle custom month formatting
         clean_month = monthly_rev['Month'].str.replace('Sept', 'Sep').str.replace('July', 'Jul')
         monthly_rev['DateOrder'] = pd.to_datetime(clean_month, format='%b-%Y', errors='coerce')
         monthly_rev = monthly_rev.dropna(subset=['DateOrder']).sort_values('DateOrder')
@@ -192,7 +190,10 @@ try:
         st.subheader("Quality Mix")
         if not f_df.empty:
             q_mix = f_df['Quality status'].value_counts().reset_index()
-            fig_pie = px.pie(q_mix, names='index' if 'index' in q_mix.columns else 'Quality status', values='count' if 'count' in q_mix.columns else 'Quality status', hole=0.4)
+            # Handle column naming in different plotly/pandas versions
+            names_col = q_mix.columns[0]
+            values_col = q_mix.columns[1]
+            fig_pie = px.pie(q_mix, names=names_col, values=values_col, hole=0.4)
             st.plotly_chart(fig_pie, use_container_width=True)
 
     # --- CANCELLATION REASON SUMMARY ---
@@ -206,10 +207,8 @@ try:
             fig_reasons = px.bar(
                 reason_counts.head(10), 
                 y='Reason', x='Count',
-                orientation='h',
-                text_auto=True,
-                color='Count',
-                color_continuous_scale='Reds'
+                orientation='h', text_auto=True,
+                color='Count', color_continuous_scale='Reds'
             )
             fig_reasons.update_layout(yaxis={'categoryorder':'total ascending'})
             st.plotly_chart(fig_reasons, use_container_width=True)
@@ -236,14 +235,16 @@ try:
     # --- SEARCH ---
     with st.expander("🔍 Search Transaction Details"):
         search_query = st.text_input("Search by Customer Name or Phone Number")
+        display_df = f_df.copy()
+        
         if search_query:
-            search_df = f_df[
-                (f_df['Customer Name'].str.contains(search_query, case=False, na=False)) |
-                (f_df['Phone No.'].astype(str).str.contains(search_query, na=False))
+            display_df = display_df[
+                (display_df['Customer Name'].str.contains(search_query, case=False, na=False)) |
+                (display_df['Phone No.'].astype(str).str.contains(search_query, na=False))
             ]
-            st.dataframe(search_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
-        else:
-            st.dataframe(f_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
+        
+        # Displaying with formatting
+        st.dataframe(display_df.style.format({"Amount": "£{:,.2f}"}), use_container_width=True)
 
 except Exception as e:
     st.error(f"Error: {e}")
