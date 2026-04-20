@@ -44,6 +44,7 @@ def load_and_clean_data():
             'Approved': 'Approved',
             'Rejected': 'Quality Rejected',
             'Rejectet': 'Quality Rejected',
+            'Cancelled':'Quality Cancelled',
             'Quality rejected': 'Quality Rejected',
             'Quality Rejected': 'Quality Rejected',
             'Qulaity rejected': 'Quality Rejected',
